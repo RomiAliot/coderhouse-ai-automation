@@ -1,0 +1,309 @@
+{
+  "name": "My workflow 3",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.mensaje }}",
+        "options": {
+          "systemMessage": "ROL\nSos un asistente virtual de Esteticabahia, un centro de estética de Bahía Blanca.\n\nÁMBITO\nAtendés consultas sobre tratamientos, precios, duración y contraindicaciones.\nUsás solo la información obtenida de la herramienta de Google Sheets.\n\nOBJETIVO\nResponder con precisión la consulta del cliente y orientarlo a pedir un turno si lo solicita.\n\nREGLAS\n- No inventes precios, turnos, duraciones ni contraindicaciones.\n- Si un dato no está en la planilla, decí que no lo tenés y que lo consulte por WhatsApp o teléfono.\n- Respondé siempre en texto corrido, en español rioplatense, en tono cordial y breve.\n- Nunca respondas en JSON ni con llaves.\n- No uses lenguaje inclusivo (\"todes\", \"@\", \"e\", \"los/las\").\n- No realizás reservas, cancelaciones ni modificaciones de turnos. No das consejos médicos.\n\nESCALAMIENTO\nSi la consulta es médica o está fuera del ámbito, derivá al cliente a WhatsApp o teléfono del centro.",
+          "maxIterations": 5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -224,
+        -240
+      ],
+      "id": "a868b852-bb62-46d8-be51-b577e0ecd363",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -752,
+        -240
+      ],
+      "id": "2fddfa7e-7597-4057-9503-4c648b5e6e48",
+      "name": "When chat message received",
+      "webhookId": "fff0312d-6b2a-45bf-8e40-7d5435030cbb"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {
+          "temperature": 0.7
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -304,
+        0
+      ],
+      "id": "51917721-167e-4dd0-ab00-b35973a4db37",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "1AQR1OVgugXfbVr9",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "09e6d2bf-555b-465f-b6ba-83571246c539",
+              "name": "mensaje",
+              "value": "={{ $json.chatInput.trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "e19bd9bc-6439-40ca-aa5a-7aaca0a239ef",
+              "name": "={{ $now.toISO() }}",
+              "value": "fecha_recepcion",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -496,
+        -240
+      ],
+      "id": "657230a1-d787-480e-ae98-e19af7293443",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        -144,
+        0
+      ],
+      "id": "b221da72-66a4-41df-8e18-7f5a286f2746",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"categoria\": { \"type\": \"string\", \"enum\": [\"turno\", \"presupuesto\", \"tratamiento_info\", \"cancelacion\", \"otro\"] },\n    \"tratamiento\": { \"type\": [\"string\", \"null\"] },\n    \"fecha_preferida\": { \"type\": [\"string\", \"null\"] },\n    \"primera_vez\": { \"type\": [\"boolean\", \"null\"] },\n    \"urgencia\": { \"type\": \"string\", \"enum\": [\"alta\", \"normal\"] },\n    \"resumen\": { \"type\": \"string\" }\n  },\n  \"required\": [\"categoria\", \"urgencia\", \"resumen\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        16,
+        0
+      ],
+      "id": "1ffca877-2738-4ea5-9069-c5e75ba7defa",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "content": "##  Tools a usar por el agente\n",
+        "height": 208,
+        "width": 384
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        176,
+        -32
+      ],
+      "typeVersion": 1,
+      "id": "ba5deed4-ec9f-46c2-b332-84341fd29e34",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Consulta la planilla de datos del centro (hoja Tratamientos) con los tratamientos\ndisponibles, sus precios en ARS, duración en minutos, contraindicaciones y descripción.\n\nActivala de forma autónoma SIEMPRE que el cliente:\n- Pregunte por el precio de cualquier tratamiento.\n- Pregunte cuánto dura un tratamiento o cuánto tiempo lleva.\n- Pregunte si un tratamiento es apto para su caso (embarazo, piel sensible, medicación, etc.).\n- Pida información general sobre un tratamiento o quiera comparar dos.\n- Mencione un tratamiento por nombre aunque no pregunte nada específico.\n\nNo la uses para saludos, despedidas ni consultas que no tengan relación con tratamientos.",
+        "documentId": {
+          "__rl": true,
+          "value": "1nmIDt3xqcxOlekTaqTD7s-Uz_PFa5AQWht-PBrV8qRo",
+          "mode": "list",
+          "cachedResultName": "Estetica_Datos",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nmIDt3xqcxOlekTaqTD7s-Uz_PFa5AQWht-PBrV8qRo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 528683730,
+          "mode": "list",
+          "cachedResultName": "tratamientos",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nmIDt3xqcxOlekTaqTD7s-Uz_PFa5AQWht-PBrV8qRo/edit#gid=528683730"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        208,
+        16
+      ],
+      "id": "fe49af21-9208-41d0-aa65-c455c84eceba",
+      "name": "Obtener info de sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "I2FCybpQ5yL6M3EK",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "romi.aliotta@gmail.com",
+        "subject": "=Consulta: {{ $('Edit Fields').item.json.mensaje.substring(0, 50) }}",
+        "message": "=Consulta recibida:\n{{ $('Edit Fields').item.json.mensaje }}\n\nFecha de recepción:\n{{ $('Edit Fields').item.json.fecha_recepcion }}\n\nRespuesta enviada al cliente:\n{{ $('AI Agent').item.json.output }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        160,
+        -240
+      ],
+      "id": "9172177e-2fb9-476e-82e5-81a94195ce13",
+      "name": "Send a message",
+      "webhookId": "10877360-ecab-424e-9907-63fb3ab59b97",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "1ujAKvbzmYdnTE0F",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "745b0a41-26b5-4755-a079-4961736bd5ad",
+              "name": "={{ $('AI Agent').item.json.output }}",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        384,
+        -240
+      ],
+      "id": "b50335cf-113f-42c7-886e-6955468a68ad",
+      "name": "Edit Fields1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        []
+      ]
+    },
+    "Obtener info de sheets": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d1bae201-6e19-424f-b6d6-0a65d7daffa5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c873f0446684e78ccd19b5103c5794e965e910067dc4f5ca964695ab607b14b0"
+  },
+  "nodeGroups": [],
+  "id": "zCcYgiprkHtr0DKN",
+  "tags": []
+}
